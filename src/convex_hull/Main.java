@@ -20,6 +20,7 @@ import javafx.scene.input.Dragboard;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.paint.Color;
+import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
 
 public class Main extends Application {
@@ -93,6 +94,7 @@ public class Main extends Application {
 	private double pointsWidth, pointsHeight;
 	private double minX, minY;
 	private ResizableCanvas canvas;
+	private String areaText;
 
 	class SizeConverter {
 		private double originWidth, originHeight, targetWidth, targetHeight, offsetX, offsetY, border;
@@ -157,6 +159,12 @@ public class Main extends Application {
 					}
 					gc.stroke();
 				}
+			}
+
+			if (areaText != null) {
+				gc.setTextAlign(TextAlignment.CENTER);
+				gc.setFill(Color.RED);
+				gc.fillText(areaText, 0.5 * height, 0.5 * width);
 			}
 		});
 
@@ -285,6 +293,7 @@ public class Main extends Application {
 	}
 
 	private void findConvexHull() {
+		areaText = null;
 		LinkedList<Point> pointQueue = new LinkedList<>(hullPoints);
 		while (!pointQueue.isEmpty()) {
 			Point h = pointQueue.removeFirst();
@@ -314,11 +323,7 @@ public class Main extends Application {
 				}
 				// update UI
 				if (changed) {
-					try {
-						runAndWait(() -> canvas.draw());
-						Thread.sleep(10);
-					} catch (ExecutionException | InterruptedException e) {
-						e.printStackTrace();
+					if (!updateAndSleep(10)) {
 						return;
 					}
 				}
@@ -333,19 +338,67 @@ public class Main extends Application {
 				pointQueue.addLast(h.get2());
 			}
 
-			// update UI
 			currentH = null;
-			try {
-				runAndWait(() -> canvas.draw());
-			} catch (ExecutionException | InterruptedException e) {
-				e.printStackTrace();
-			}
+			updateUI();
 		}
 
-		calculateConvexHull(hullPoints);
+		calculateConvexArea(hullPoints);
 	}
 
-	private void calculateConvexHull(Collection<Point> hullPoints) {
-		// TODO implement
+	private boolean updateUI() {
+		return updateAndSleep(0);
+	}
+
+	private boolean updateAndSleep(long millis) {
+		try {
+			runAndWait(() -> canvas.draw());
+			Thread.sleep(millis);
+		} catch (ExecutionException | InterruptedException e) {
+			return false;
+		}
+		return true;
+	}
+
+	private void calculateConvexArea(Collection<Point> hullPoints) {
+		// take any point as starting point
+		Point start = hullPoints.iterator().next();
+		// link all hull points
+		List<Point2D> hullList = new LinkedList<>();
+		hullList.add(start.getPoint());
+		Point last = start;
+		Point cur = start.get1();
+		while (!cur.equals(start)) {
+			hullList.add(cur.getPoint());
+			if (!cur.get1().equals(last)) {
+				last = cur;
+				cur = cur.get1();
+			} else {
+				last = cur;
+				cur = cur.get2();
+			}
+		}
+		// calculate area
+		double area = convexPolygonArea(hullList);
+		areaText = String.valueOf(Math.round(area));
+		updateUI();
+	}
+
+	/**
+	 * calculates the area of a convex polygon /* (formula from
+	 * http://www.mathwords.com/a/area_convex_polygon.htm)
+	 * 
+	 * @param vertices
+	 *            of the polygon
+	 * @return area
+	 */
+	private double convexPolygonArea(List<Point2D> vertices) {
+		Point2D first = vertices.get(0);
+		double sum = 0;
+		for (int i = 0; i < vertices.size(); i++) {
+			Point2D cur = vertices.get(i);
+			Point2D next = (i < vertices.size() - 1 ? vertices.get(i + 1) : first);
+			sum += (cur.getX() * next.getY()) - (cur.getY() * next.getX());
+		}
+		return Math.abs(sum * 0.5);
 	}
 }
