@@ -4,7 +4,6 @@ JavaFX application to calculate the area of a convex hull.
 This code is
 - a proof of concept
 - not optimized for anything
-- not finished
 - messy
 
 ### Usage
@@ -27,4 +26,5 @@ Die implementierten Algorithmen basieren auf nichts anderem als meinen eigenen G
 - [x] Punkte einlesen
 - [x] Punkte grafisch darstellen
 - [x] konvexe Hülle finden
-- [ ] Fläche berechnen
+- [x] Fläche berechnen
+- [ ] refactor / cleanup
