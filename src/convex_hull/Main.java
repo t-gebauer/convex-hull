@@ -2,20 +2,14 @@ package convex_hull;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Scanner;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.FutureTask;
 
 import javafx.application.Application;
-import javafx.application.Platform;
 import javafx.geometry.Point2D;
 import javafx.scene.Scene;
-import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.BorderPane;
@@ -29,135 +23,53 @@ public class Main extends Application {
 		launch(args);
 	}
 
-	interface DrawListener {
-		abstract public void draw(GraphicsContext gc, double width, double height);
-	}
-
-	class Point {
-		private Point2D p; // this points coordinates
-		private Point n1, n2; // neighbors
-		private Point2D v1, v2; // vectors p->n1; p->n2
-
-		public Point(double x, double y) {
-			p = new Point2D(x, y);
-		}
-
-		public double getX() {
-			return p.getX();
-		}
-
-		public double getY() {
-			return p.getY();
-		}
-
-		public Point2D getPoint() {
-			return p;
-		}
-
-		public Point get1() {
-			return n1;
-		}
-
-		public Point get2() {
-			return n2;
-		}
-
-		public boolean has1() {
-			return n1 != null;
-		}
-
-		public boolean has2() {
-			return n2 != null;
-		}
-
-		public void set1(Point n) {
-			n1 = n;
-			v1 = n.getPoint().subtract(p);
-		}
-
-		public void set2(Point n) {
-			n2 = n;
-			v2 = n.getPoint().subtract(p);
-		}
-
-		public Point2D getV1() {
-			return v1;
-		}
-
-		public Point2D getV2() {
-			return v2;
-		}
-	}
-
 	private List<Point> points = new LinkedList<>();
-	private Set<Point> hullPoints = new HashSet<>();
 	private double pointsWidth, pointsHeight;
 	private double minX, minY;
 	private ResizableCanvas canvas;
-	private String areaText;
-
-	class SizeConverter {
-		private double originWidth, originHeight, targetWidth, targetHeight, offsetX, offsetY, border;
-
-		public SizeConverter(double originWidth, double originHeight, double targetWidth, double targetHeight,
-				double offsetX, double offsetY, double border) {
-			this.originWidth = originWidth;
-			this.originHeight = originHeight;
-			this.targetWidth = targetWidth;
-			this.targetHeight = targetHeight;
-			this.offsetX = offsetX;
-			this.offsetY = offsetY;
-			this.border = border;
-		}
-
-		public Point2D convert(Point2D point) {
-			double x = ((point.getX() - offsetX) * (targetWidth - (2 * border)) / originWidth) + border;
-			double y = ((point.getY() - offsetY) * (targetHeight - (2 * border)) / originHeight) + border;
-			return new Point2D(x, y);
-		}
-	}
+	private String areaText = null;
+	private Thread calculationThread = null;
 
 	@Override
 	public void start(Stage primaryStage) {
 		primaryStage.setTitle("Convex Hull");
 		BorderPane root = new BorderPane();
 		canvas = new ResizableCanvas(root);
+		initDrawListener();
+		root.getChildren().add(canvas);
 
+		Scene scene = new Scene(root, 400, 400, Color.BLACK);
+		initDragAndDrop(scene);
+
+		primaryStage.setScene(scene);
+		primaryStage.show();
+	}
+
+	private void initDrawListener() {
 		canvas.addDrawListener((gc, width, height) -> {
 			gc.clearRect(0, 0, width, height);
 
 			double size = Math.max(height * 0.01, 1);
 			double border = width * 0.1;
-			SizeConverter converter = new SizeConverter(pointsWidth, pointsHeight, width, height, minX, minY, border);
+			SizeConverter converter = new SizeConverter(pointsWidth, pointsHeight,
+					width, height, minX, minY, border);
 
+			// draw all points
 			for (Point p : points) {
-				if (hullPoints.contains(p)) {
+				if (p.isHull()) {
 					gc.setFill(Color.RED);
+					gc.setStroke(Color.RED);
 				} else {
 					gc.setFill(Color.YELLOW);
 				}
+				// draw point
 				Point2D pConv = converter.convert(p.getPoint());
-				gc.fillOval(pConv.getX() - (size / 2), pConv.getY() - (size / 2), size, size);
-			}
-
-			for (Point hPoint : hullPoints) {
-				if (currentH != null && hPoint.equals(currentH)) {
-					gc.setStroke(Color.GREEN);
-				} else {
-					gc.setStroke(Color.RED);
-				}
-
-				if (hPoint.has1()) {
-					Point2D h = converter.convert(hPoint.getPoint());
-					Point2D n1 = converter.convert(hPoint.get1().getPoint());
-					gc.beginPath();
-					gc.moveTo(n1.getX(), n1.getY());
-					gc.lineTo(h.getX(), h.getY());
-					if (hPoint.has2()) {
-						Point2D n2 = converter.convert(hPoint.get2().getPoint());
-						gc.lineTo(n2.getX(), n2.getY());
-					}
-					gc.stroke();
+				gc.fillOval(pConv.getX() - (size / 2), pConv.getY() - (size / 2),
+						size, size);
+				// draw line to next (if hull)
+				if (p.hasNext()) {
+					Point2D next = converter.convert(p.next().getPoint());
+					gc.strokeLine(pConv.getX(), pConv.getY(), next.getX(), next.getY());
 				}
 			}
 
@@ -167,11 +79,9 @@ public class Main extends Application {
 				gc.fillText(areaText, 0.5 * height, 0.5 * width);
 			}
 		});
+	}
 
-		root.getChildren().add(canvas);
-		Scene scene = new Scene(root, 400, 400, Color.BLACK);
-		scene.getStylesheets().add(getClass().getResource("application.css").toExternalForm());
-
+	private void initDragAndDrop(Scene scene) {
 		scene.setOnDragOver((event) -> {
 			Dragboard db = event.getDragboard();
 			if (db.hasFiles()) {
@@ -180,7 +90,6 @@ public class Main extends Application {
 				event.consume();
 			}
 		});
-
 		// Dropping over surface
 		scene.setOnDragDropped((event) -> {
 			Dragboard db = event.getDragboard();
@@ -194,14 +103,12 @@ public class Main extends Application {
 			event.setDropCompleted(success);
 			event.consume();
 		});
-
-		primaryStage.setScene(scene);
-		primaryStage.show();
 	}
 
 	private void readPointsFromFile(File file) {
 		try (Scanner scanner = new Scanner(file)) {
 			List<Point> points = new LinkedList<>();
+			// TODO we don't really need these lists: save one minX point as the start
 			List<Point> minXPoints = new LinkedList<>();
 			List<Point> maxXPoints = new LinkedList<>();
 			List<Point> minYPoints = new LinkedList<>();
@@ -257,14 +164,7 @@ public class Main extends Application {
 					e.printStackTrace();
 				}
 			}
-			// these points are definitely part of the hull
-			Set<Point> hullPoints = new HashSet<>();
-			hullPoints.addAll(minXPoints);
-			hullPoints.addAll(maxXPoints);
-			hullPoints.addAll(minYPoints);
-			hullPoints.addAll(maxYPoints);
 			// update fields
-			this.hullPoints = hullPoints;
 			this.minX = minX;
 			this.minY = minY;
 			this.pointsWidth = maxX - minX;
@@ -275,71 +175,46 @@ public class Main extends Application {
 			if (calculationThread != null) {
 				calculationThread.interrupt();
 			}
-			calculationThread = new Thread(() -> findConvexHull());
+			calculationThread = new Thread(() -> findConvexHull(minXPoints.get(0), points));
 			calculationThread.start();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 
-	private Thread calculationThread = null;
-
-	private Point currentH;
-
-	public static void runAndWait(Runnable run) throws InterruptedException, ExecutionException {
-		FutureTask<Void> task = new FutureTask<>(run, null);
-		Platform.runLater(task);
-		task.get();
-	}
-
-	private void findConvexHull() {
+	private void findConvexHull(Point start, List<Point> points) {
 		areaText = null;
-		LinkedList<Point> pointQueue = new LinkedList<>(hullPoints);
-		while (!pointQueue.isEmpty()) {
-			Point h = pointQueue.removeFirst();
-			currentH = h;
-			boolean changed;
+		List<Point> hullPoints = new LinkedList<>();
+		// we know where the starting point is -> choose a helper point which guarantees
+		// the maximum angle (also defines the search direction)
+		start.setPrev(new Point(start.getX(), start.getY() + 1));
+		Point current = start;
+		while (!current.hasNext()) {
+			hullPoints.add(current);
+
 			for (Point p : points) {
-				changed = false;
-
-				if (p.equals(h)) {
+				if (p.equals(current)) {
 					continue;
-				} else if (!h.has1()) {
-					h.set1(p);
-				} else if (!h.has2()) {
-					h.set2(p);
+				} else if (!current.hasNext()) {
+					current.setNext(p);
 				} else {
-					Point2D v = p.getPoint().subtract(h.getPoint());
-					double angleH = h.getV1().angle(h.getV2());
-					double angleP1 = h.getV1().angle(v);
-					double angleP2 = h.getV2().angle(v);
-					if (angleP1 > angleH && angleP1 > angleP2) {
-						changed = true;
-						h.set2(p);
-					} else if (angleP2 > angleH) {
-						changed = true;
-						h.set1(p);
+					Point2D v = p.getPoint().subtract(current.getPoint());
+					double currentAngle = current.angle();
+					double newAngle = current.angle(v);
+					if (newAngle > currentAngle) {
+						current.setNext(p);
+						// TODO save the angle? no need to recalculate for other checks
 					}
 				}
-				// update UI
-				if (changed) {
-					if (!updateAndSleep(10)) {
-						return;
-					}
-				}
-			}
-			// enqueue new hull points
-			if (!hullPoints.contains(h.get1())) {
-				hullPoints.add(h.get1());
-				pointQueue.addLast(h.get1());
-			}
-			if (!hullPoints.contains(h.get2())) {
-				hullPoints.add(h.get2());
-				pointQueue.addLast(h.get2());
 			}
 
-			currentH = null;
-			updateUI();
+			current.next().setPrev(current);
+			current = current.next();
+
+			// update UI
+			if (!updateAndSleep(10)) {
+				return;
+			}
 		}
 
 		calculateConvexArea(hullPoints);
@@ -351,7 +226,7 @@ public class Main extends Application {
 
 	private boolean updateAndSleep(long millis) {
 		try {
-			runAndWait(() -> canvas.draw());
+			Helper.runAndWait(() -> canvas.draw());
 			Thread.sleep(millis);
 		} catch (ExecutionException | InterruptedException e) {
 			return false;
@@ -359,24 +234,9 @@ public class Main extends Application {
 		return true;
 	}
 
-	private void calculateConvexArea(Collection<Point> hullPoints) {
-		// take any point as starting point
-		Point start = hullPoints.iterator().next();
-		// link all hull points
+	private void calculateConvexArea(List<Point> hullPoints) {
 		List<Point2D> hullList = new LinkedList<>();
-		hullList.add(start.getPoint());
-		Point last = start;
-		Point cur = start.get1();
-		while (!cur.equals(start)) {
-			hullList.add(cur.getPoint());
-			if (!cur.get1().equals(last)) {
-				last = cur;
-				cur = cur.get1();
-			} else {
-				last = cur;
-				cur = cur.get2();
-			}
-		}
+		hullPoints.forEach((p) -> hullList.add(p.getPoint()));
 		// calculate area
 		double area = convexPolygonArea(hullList);
 		areaText = String.valueOf(Math.round(area));
@@ -388,8 +248,9 @@ public class Main extends Application {
 	 * http://www.mathwords.com/a/area_convex_polygon.htm)
 	 * 
 	 * @param vertices
-	 *            of the polygon
-	 * @return area
+	 *            of the polygon.
+	 * @return area (positive if vertices in counterclockwise order; negative
+	 *         otherwise)
 	 */
 	private double convexPolygonArea(List<Point2D> vertices) {
 		Point2D first = vertices.get(0);
@@ -399,6 +260,6 @@ public class Main extends Application {
 			Point2D next = (i < vertices.size() - 1 ? vertices.get(i + 1) : first);
 			sum += (cur.getX() * next.getY()) - (cur.getY() * next.getX());
 		}
-		return Math.abs(sum * 0.5);
+		return sum * 0.5;
 	}
 }

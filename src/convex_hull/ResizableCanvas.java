@@ -3,13 +3,16 @@ package convex_hull;
 import java.util.LinkedList;
 import java.util.List;
 
-import convex_hull.Main.DrawListener;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.Pane;
 
 class ResizableCanvas extends Canvas {
 	
+	interface DrawListener {
+		abstract public void draw(GraphicsContext gc, double width, double height);
+	}
+
 	private List<DrawListener> drawListeners = new LinkedList<>();
 	
 	public void addDrawListener(DrawListener listener) {
@@ -18,10 +21,9 @@ class ResizableCanvas extends Canvas {
 	 
     public ResizableCanvas(Pane pane) {
 		// Bind canvas size to stack pane size.
-		
     	widthProperty().bind(pane.widthProperty());
 		heightProperty().bind(pane.heightProperty());
-	  // Redraw canvas when size changes.
+		// Redraw canvas when size changes.
 		widthProperty().addListener(evt -> draw());
 		heightProperty().addListener(evt -> draw());
     }
