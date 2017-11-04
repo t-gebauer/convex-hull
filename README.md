@@ -1,10 +1,9 @@
-JavaFX application to calculate the area of a convex hull.
+JavaFX application to calculate the area of a convex hull and display it with a fancy UI.
 
 ###
 This code is
 - a proof of concept
 - not optimized for anything
-- messy
 
 ### Usage
 - run the application
@@ -20,11 +19,11 @@ This code is
 #
 ### Programmieraufgabe für die Bewerbung zum Studiengang Digital Reality SoSe18 an der HAW Hamburg.
 
-Die implementierten Algorithmen basieren auf nichts anderem als meinen eigenen Gedanken.
+Die implementierten Algorithmen basieren auf nichts anderem als meinen eigenen Gedanken und auf über Generationen über multiple Medien weitergereichtem Wissen.
 
 ### TODO
 - [x] Punkte einlesen
 - [x] Punkte grafisch darstellen
 - [x] konvexe Hülle finden
 - [x] Fläche berechnen
-- [ ] refactor / cleanup
+- [ ] Aspect-ratio beibehalten

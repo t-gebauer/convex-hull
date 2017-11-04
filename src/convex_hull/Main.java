@@ -108,20 +108,15 @@ public class Main extends Application {
 	private void readPointsFromFile(File file) {
 		try (Scanner scanner = new Scanner(file)) {
 			List<Point> points = new LinkedList<>();
-			// TODO we don't really need these lists: save one minX point as the start
-			List<Point> minXPoints = new LinkedList<>();
-			List<Point> maxXPoints = new LinkedList<>();
-			List<Point> minYPoints = new LinkedList<>();
-			List<Point> maxYPoints = new LinkedList<>();
+			Point oneMinXPoint = null;
 			double minX = 0, minY = 0, maxX = 0, maxY = 0;
 
 			double x = 0;
 			boolean hasX = false;
 			boolean first_values = true;
 			while (scanner.hasNext()) {
-				double value;
 				try {
-					value = Double.parseDouble(scanner.next());
+					double value = Double.parseDouble(scanner.next());
 					if (!hasX) {
 						hasX = true;
 						x = value;
@@ -130,33 +125,18 @@ public class Main extends Application {
 						double y = value;
 						Point p = new Point(x, y);
 						points.add(p);
-						if (x <= minX || first_values) {
-							if (x < minX || first_values) {
-								minX = x;
-								minXPoints.clear();
-							}
-							minXPoints.add(p);
+						if (x < minX || first_values) {
+							minX = x;
+							oneMinXPoint = p;
 						}
-						if (x >= maxX || first_values) {
-							if (x > maxX || first_values) {
-								maxX = x;
-								maxXPoints.clear();
-							}
-							maxXPoints.add(p);
+						if (x > maxX || first_values) {
+							maxX = x;
 						}
-						if (y <= minY || first_values) {
-							if (y < minY || first_values) {
-								minY = y;
-								minYPoints.clear();
-							}
-							minYPoints.add(p);
+						if (y < minY || first_values) {
+							minY = y;
 						}
-						if (y >= maxY || first_values) {
-							if (y > maxY || first_values) {
-								maxY = y;
-								maxYPoints.clear();
-							}
-							maxYPoints.add(p);
+						if (y > maxY || first_values) {
+							maxY = y;
 						}
 						first_values = false;
 					}
@@ -170,12 +150,14 @@ public class Main extends Application {
 			this.pointsWidth = maxX - minX;
 			this.pointsHeight = maxY - minY;
 			this.points = points;
-
+			this.areaText = null;
 			canvas.draw();
+
+			final Point startPoint = oneMinXPoint;
 			if (calculationThread != null) {
 				calculationThread.interrupt();
 			}
-			calculationThread = new Thread(() -> findConvexHull(minXPoints.get(0), points));
+			calculationThread = new Thread(() -> findConvexHull(startPoint, points));
 			calculationThread.start();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -183,7 +165,6 @@ public class Main extends Application {
 	}
 
 	private void findConvexHull(Point start, List<Point> points) {
-		areaText = null;
 		List<Point> hullPoints = new LinkedList<>();
 		// we know where the starting point is -> choose a helper point which guarantees
 		// the maximum angle (also defines the search direction)
@@ -207,10 +188,8 @@ public class Main extends Application {
 					}
 				}
 			}
-
 			current.next().setPrev(current);
 			current = current.next();
-
 			// update UI
 			if (!updateAndSleep(10)) {
 				return;
