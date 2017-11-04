@@ -49,9 +49,9 @@ public class Main extends Application {
 		canvas.addDrawListener((gc, width, height) -> {
 			gc.clearRect(0, 0, width, height);
 
-			double size = Math.max(height * 0.01, 1);
-			double border = width * 0.1;
-			SizeConverter converter = new SizeConverter(pointsWidth, pointsHeight,
+			double size = Math.max(Math.min(width, height) * 0.01, 4);
+			double border = 0.05;
+			PointTransformer converter = new PointTransformer(pointsWidth, pointsHeight,
 					width, height, minX, minY, border);
 
 			// draw all points
@@ -76,7 +76,7 @@ public class Main extends Application {
 			if (areaText != null) {
 				gc.setTextAlign(TextAlignment.CENTER);
 				gc.setFill(Color.RED);
-				gc.fillText(areaText, 0.5 * height, 0.5 * width);
+				gc.fillText(areaText, 0.5 * width, 0.5 * height);
 			}
 		});
 	}

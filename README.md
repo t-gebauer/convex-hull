@@ -26,4 +26,4 @@ Die implementierten Algorithmen basieren auf nichts anderem als meinen eigenen G
 - [x] Punkte grafisch darstellen
 - [x] konvexe Hülle finden
 - [x] Fläche berechnen
-- [ ] Aspect-ratio beibehalten
+- [ ] Hülle animieren
