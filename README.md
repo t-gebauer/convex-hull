@@ -7,7 +7,8 @@ This code is
 
 ### Usage
 - run the application
-  - import eclipse project -> run
+  - download release and run `java -jar filename.jar`
+  - or import eclipse project -> run
   - or execute the java code any other way...
 - drag and drop files from `res/` onto the window
 - enjoy the animation
