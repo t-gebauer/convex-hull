@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.ExecutionException;
 
+import javafx.animation.Animation;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.geometry.Point2D;
 import javafx.scene.Scene;
@@ -16,6 +19,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 public class Main extends Application {
 
@@ -29,13 +33,14 @@ public class Main extends Application {
 	private ResizableCanvas canvas;
 	private String areaText = null;
 	private Thread calculationThread = null;
+	private Point highlightPoint = null;
 
 	@Override
 	public void start(Stage primaryStage) {
 		primaryStage.setTitle("Convex Hull");
 		BorderPane root = new BorderPane();
 		canvas = new ResizableCanvas(root);
-		initDrawListener();
+		initCanvas();
 		root.getChildren().add(canvas);
 
 		Scene scene = new Scene(root, 400, 400, Color.BLACK);
@@ -45,40 +50,56 @@ public class Main extends Application {
 		primaryStage.show();
 	}
 
-	private void initDrawListener() {
+	private void initCanvas() {
 		canvas.addDrawListener((gc, width, height) -> {
 			gc.clearRect(0, 0, width, height);
 
-			double size = Math.max(Math.min(width, height) * 0.01, 4);
+			double normalSize = Math.max(Math.min(width, height) * 0.01, 4);
 			double border = 0.05;
 			PointTransformer converter = new PointTransformer(pointsWidth, pointsHeight,
 					width, height, minX, minY, border);
 
 			// draw all points
+			double size;
 			for (Point p : points) {
+				size = normalSize;
 				if (p.isHull()) {
-					gc.setFill(Color.RED);
-					gc.setStroke(Color.RED);
+					if (p.equals(highlightPoint)) {
+						size = 2 * normalSize;
+						gc.setFill(Color.WHITE);
+					} else {
+						gc.setFill(Color.GREEN);
+					}
+					gc.setStroke(Color.GREEN);
 				} else {
-					gc.setFill(Color.YELLOW);
+					gc.setFill(Color.WHITE);
 				}
-				// draw point
 				Point2D pConv = converter.convert(p.getPoint());
-				gc.fillOval(pConv.getX() - (size / 2), pConv.getY() - (size / 2),
-						size, size);
 				// draw line to next (if hull)
 				if (p.hasNext()) {
 					Point2D next = converter.convert(p.next().getPoint());
 					gc.strokeLine(pConv.getX(), pConv.getY(), next.getX(), next.getY());
 				}
+				// draw point
+				gc.fillOval(pConv.getX() - (size / 2), pConv.getY() - (size / 2), size, size);
 			}
 
 			if (areaText != null) {
 				gc.setTextAlign(TextAlignment.CENTER);
-				gc.setFill(Color.RED);
+				gc.setFill(Color.WHITE);
 				gc.fillText(areaText, 0.5 * width, 0.5 * height);
 			}
 		});
+		// schedule animation (cycle through hull points indefinitely)
+		Timeline timeline = new Timeline();
+		timeline.setCycleCount(Animation.INDEFINITE);
+		timeline.getKeyFrames().add(new KeyFrame(Duration.millis(350), ae -> {
+			if (highlightPoint != null && highlightPoint.hasNext()) {
+				highlightPoint = highlightPoint.next();
+				canvas.draw();
+			}
+		}));
+		timeline.play();
 	}
 
 	private void initDragAndDrop(Scene scene) {
@@ -150,7 +171,8 @@ public class Main extends Application {
 			this.pointsWidth = maxX - minX;
 			this.pointsHeight = maxY - minY;
 			this.points = points;
-			this.areaText = null;
+			areaText = null;
+			highlightPoint = null;
 			canvas.draw();
 
 			final Point startPoint = oneMinXPoint;
@@ -219,6 +241,7 @@ public class Main extends Application {
 		// calculate area
 		double area = convexPolygonArea(hullList);
 		areaText = String.valueOf(Math.round(area));
+		highlightPoint = hullPoints.get(0);
 		updateUI();
 	}
 
